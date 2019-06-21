@@ -233,6 +233,7 @@ public class MapsActivity extends FragmentActivity
                             String countryName = addresses.get(0).getAddressLine(2);
                          //   Toast.makeText(MapsActivity.this, addresses.get(0).getLocality(), Toast.LENGTH_SHORT).show();
                              String ans=(countryName!=null?countryName+" ":"")+(stateName!=null?stateName+"  ":"")+(cityName!=null?cityName+"  ":"");
+                             ans=ans.trim();
                              if(ans!=null&&!ans.isEmpty()) {
                                  txt_gbs.setText(ans);
                                  options.title(ans);
