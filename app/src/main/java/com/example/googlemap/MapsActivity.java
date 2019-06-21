@@ -68,8 +68,8 @@ public class MapsActivity extends FragmentActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         initializeAllWidget();
-        accessLocation();
         makeNecessaryEvent();
+        initTheMap();
 
     }
     private void initializeAllWidget() {
@@ -190,59 +190,6 @@ public class MapsActivity extends FragmentActivity
         return false;
     }
 
-    private boolean isSucessServices(){
-        int avaliable= GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(MapsActivity.this);
-        if(avaliable== ConnectionResult.SUCCESS){
-            return true;
-        }else if(GoogleApiAvailability.getInstance().isUserResolvableError(avaliable)){
-            return false;
-        }else{
-            return false;
-        }
-
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        //super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        premission_given=false;
-        switch(requestCode){
-            case MY_PREMISSION:{
-                if(grantResults.length>0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    for(int i=0;i<grantResults.length;i++){
-                        if(grantResults[i]!=PackageManager.PERMISSION_GRANTED){
-                            premission_given=false;
-                            return;
-                        }
-                    }
-                    premission_given=true;
-                    //initalize The Map
-                    initTheMap();
-                }
-
-            }
-        }
-    }
-
-    private void accessLocation(){
-        String []premission={Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION};
-        if(ContextCompat.checkSelfPermission(this.getApplicationContext(),Manifest.permission.ACCESS_FINE_LOCATION)== PackageManager.PERMISSION_GRANTED){
-            if(ContextCompat.checkSelfPermission(this.getApplicationContext(),Manifest.permission.ACCESS_COARSE_LOCATION)==
-                    PackageManager.PERMISSION_GRANTED){
-                premission_given=true;
-                initTheMap();
-            }
-            else{
-                ActivityCompat.requestPermissions(this,premission,MY_PREMISSION);
-            }
-        }else{
-            ActivityCompat.requestPermissions(this,premission,MY_PREMISSION);
-        }
-    }
-
-  /*  private void moveCamera(LatLng latLng, float zoom){
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
-    }*/
     private void initTheMap(){
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
