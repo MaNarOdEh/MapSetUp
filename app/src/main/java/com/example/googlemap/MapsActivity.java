@@ -4,38 +4,45 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
-
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
-import android.location.Location;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
-
+import android.widget.Toast;
+//https://thecatapi.com/
+import com.example.googlemap.weatherApi.Weather;
+import com.example.googlemap.weatherApi.WeatherMain;
+import com.example.googlemap.weatherApi.WeatherResponse;
+import com.example.googlemap.weatherApi.WeatherServices;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.snackbar.Snackbar;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.List;
 import java.util.Locale;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MapsActivity extends FragmentActivity
         implements OnMapReadyCallback {
@@ -46,9 +53,13 @@ public class MapsActivity extends FragmentActivity
     private static final int MY_PREMISSION=333;
     private FusedLocationProviderClient fusedLocationProviderClient;
     private TextView txt_gbs,txt_sessons,text_temp;
-    String OPEN_WEATHER_MAP_API = "d32d64021d1cb92523a372dd36a23037";
-    MarkerOptions options;
-    Marker marker;
+    private MarkerOptions options;
+    private Marker marker;
+    private String OPEN_WEATHER_MAP_API = "a21a79d3c32d92ebc8f8ee542782377f";
+    public static final String BASE_URL = "https://api.openweathermap.org";
+    private LinearLayout progress_bar,main_layout,linear_start_progress;
+    private BottomNavigationView bottom_navigation;
+
 
 
 
@@ -56,19 +67,134 @@ public class MapsActivity extends FragmentActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+        initializeAllWidget();
+        accessLocation();
+        makeNecessaryEvent();
+
+    }
+    private void initializeAllWidget() {
         txt_sessons=findViewById(R.id.txt_sessons);
         txt_gbs=findViewById(R.id.txt_gbs);
         text_temp=findViewById(R.id.text_temp);
         txt_sessons=findViewById(R.id.txt_sessons);
-        accessLocation();
+        progress_bar=findViewById(R.id.progress_bar);
+        progress_bar.setVisibility(View.GONE);
+        main_layout=findViewById(R.id.main_layout);
+        linear_start_progress=findViewById(R.id.linear_start_progress);
+        bottom_navigation=findViewById(R.id.bottom_navigation);
+    }
+    public void makeNecessaryEvent(){
+        bottom_navigation.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+                switch(menuItem.getItemId()){
+                    case R.id.map_hybrid:
+                        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+                        break;
+                    case R.id.map_normal:
+                        mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+                        break;
+                    case R.id.map_stateLite:
+                        mMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
+                        break;
+                    case R.id.map_terrain:
+                        mMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
+                        break;
+                }
+                menuItem.setChecked(true);
+
+                return false;
+            }
+        });
+    }
+
+    private void fetchWeather(double lat,double lon) {
+        show_progress_bar();
+       if(checkInternetConnections()) {
+           //Generate  the service && connect to the url
+           Retrofit retrofit = new Retrofit.Builder()
+                   .baseUrl(BASE_URL)
+                   .addConverterFactory(GsonConverterFactory.create())
+                   .build();
+           //Status Coden header
+           //2
+           //bad request
+           //server error
+           //scuseesful
+           WeatherServices services = retrofit.create(WeatherServices.class);
+           services.get(OPEN_WEATHER_MAP_API, lat + "", lon + "").enqueue(new Callback<WeatherResponse>() {
+               @Override
+               public void onResponse(Call<WeatherResponse> call, Response<WeatherResponse> response) {
+                   hide_progress_bar();
+                   //handle error
+                   if (!response.isSuccessful()) {
+                       try {
+                          // txt_sessons.setText(response.errorBody().string());
+                           Snackbar snackbar = Snackbar
+                                   .make(main_layout, response.message(), Snackbar.LENGTH_LONG);
+                           snackbar.show();
+
+
+                       } catch (Exception e) {
+
+                       }
+                       return;
+                   }
+
+                   if (response != null && response.body() != null) {
+                       List<Weather> w = response.body().getmWeather();
+                       if (w != null && w.size() >= 0) {
+                           txt_sessons.setText(w.get(0).getmDescription() + "  ");
+                           WeatherMain weatherMain = response.body().getmMain();
+                           text_temp.setText(Math.round(weatherMain.getmTemp() - 273.15) + "  ");
+                       }
+
+                   }
+               }
+
+               @Override
+               public void onFailure(Call<WeatherResponse> call, Throwable t) {
+                   hide_progress_bar();
+                   Snackbar snackbar = Snackbar
+                           .make(main_layout, t.getMessage(), Snackbar.LENGTH_LONG);
+                   snackbar.show();
+
+               }
+           });
+       }else{
+
+       }
 
     }
+    private  void  hide_progress_bar(){
+        progress_bar.setVisibility(View.GONE);
+        main_layout.setVisibility(View.VISIBLE);
+    }
+    private  void show_progress_bar(){
+        progress_bar.setVisibility(View.VISIBLE);
+        main_layout.setVisibility(View.GONE);
+    }
+    private boolean checkInternetConnections(){
+        ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+        if (mWifi.isConnected()) {
+            return true;
+
+            // Do whatever
+        }else{
+            Snackbar snackbar = Snackbar
+                    .make(main_layout, "You are not connected to the wifi", Snackbar.LENGTH_LONG);
+            snackbar.show();
+        }
+        return false;
+    }
+
     private boolean isSucessServices(){
         int avaliable= GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(MapsActivity.this);
         if(avaliable== ConnectionResult.SUCCESS){
             return true;
         }else if(GoogleApiAvailability.getInstance().isUserResolvableError(avaliable)){
-           //
             return false;
         }else{
             return false;
@@ -92,8 +218,6 @@ public class MapsActivity extends FragmentActivity
                     premission_given=true;
                     //initalize The Map
                     initTheMap();
-                    // permission was granted, yay! Do the
-                    // contacts-related task you need to do.
                 }
 
             }
@@ -115,169 +239,73 @@ public class MapsActivity extends FragmentActivity
             ActivityCompat.requestPermissions(this,premission,MY_PREMISSION);
         }
     }
-    private void getDeviceCurrentLocations(){
-        fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(this);
-        /*try{
-            if(premission_given){
-                final Task location = fusedLocationProviderClient.getLastLocation();
 
-                location.addOnCompleteListener(new OnCompleteListener() {
-                    @Override
-                    public void onComplete(@NonNull Task task) {
-                        if(task.isSuccessful()){
-                          //  Log.d(TAG, "onComplete: found location!");
-                            Location currentLocation = (Location) task.getResult();
-
-                            moveCamera(new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude()),
-                                    14f);
-
-                        }else{
-                          //  Log.d(TAG, "onComplete: current location is null");
-                            Toast.makeText(MapsActivity.this, "unable to get current location", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
-            }
-
-        }catch (Exception e){
-
-        }*/
-    }
-    private void moveCamera(LatLng latLng, float zoom){
+  /*  private void moveCamera(LatLng latLng, float zoom){
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
-    }
+    }*/
     private void initTheMap(){
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
     }
-    private void setUpMapIfNeeded() {
-        // Do a null check to confirm that we have not already instantiated the map.
-        if (mMap == null) {
-            // Try to obtain the map from the SupportMapFragment.
-           // mMap = googleMap;
-           // mMap.setMyLocationEnabled(true);
-            // Check if we were successful in obtaining the map.
-            if (mMap != null) {
 
-
-                mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
-
-                    @Override
-                    public void onMyLocationChange(Location arg0) {
-                        // TODO Auto-generated method stub
-
-                        mMap.addMarker(new MarkerOptions().position(new LatLng(arg0.getLatitude(), arg0.getLongitude())).title("It's Me!"));
-                    }
-                });
-
-            }
-        }
-    }
 
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
+        linear_start_progress.setVisibility(View.GONE);
         mMap = googleMap;
-
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(32, 35);
+        LatLng palestine = new LatLng(32, 35);
          options = new MarkerOptions()
-                .position(sydney)
-                .title("I am here!");
-       // marker= mMap.addMarker(new MarkerOptions().position(sydney).title("Palestine"));
-        Geocoder geo = new Geocoder(this.getApplicationContext(), Locale.getDefault());
-        try {
-            List<Address> addresses = geo.getFromLocation(32, 35, 1);
-            if (addresses.isEmpty()) {
-            //    addres.setText("Waiting for Location");
-            } else {
-                if (addresses.size() > 0) {
-                    marker= mMap.addMarker(new MarkerOptions().position(sydney).title(addresses.get(0).getAddressLine(0)));
-                    options.title(addresses.get(0).getAddressLine(0));
-                    //txt_sessons.setT
-                    //addres.setText(addresses.get(0).getFeatureName() + ", " + addresses.get(0).getLocality() + ", " + addresses.get(0).getAdminArea() + ", " + addresses.get(0).getCountryName());
-                    //Toast.makeText(getApplicationContext(), "Address:- " + addresses.get(0).getFeatureName() + addresses.get(0).getAdminArea() + addresses.get(0).getLocality(), Toast.LENGTH_LONG).show();
-                }
-            }
-        }catch(Exception e){
-
-        }
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-        //googleMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-        //googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-        //googleMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
-        //googleMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
+                .position(palestine)
+                .title("Palestine!");
+         txt_gbs.setText("Palestine!");
+        marker= mMap.addMarker(options);
+        mMap.animateCamera(CameraUpdateFactory.newLatLng(palestine));
         mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
             @Override
             public void onMapClick(LatLng latLng) {
-
                 if(marker!=null){
                     marker.remove();
                 }
                 LatLng lat = new LatLng(latLng.latitude, latLng.longitude);
+                fetchWeather(latLng.latitude,latLng.longitude);
                  options = new MarkerOptions()
-                        .position(lat)
-                        .title("I am here!");
+                        .position(lat);
+
                 Geocoder geo = new Geocoder(MapsActivity.this, Locale.getDefault());
                 try {
-                    List<Address> addresses = geo.getFromLocation(32, 35, 1);
+                    List<Address> addresses = geo.getFromLocation(lat.latitude, lat.longitude, 1);
+                    fetchWeather(lat.latitude,lat.longitude);
+
                     if (addresses.isEmpty()) {
-                        //    addres.setText("Waiting for Location");
                     } else {
                         if (addresses.size() > 0) {
-                            marker= mMap.addMarker(new MarkerOptions().position(lat).title(addresses.get(0).getAddressLine(0)));
-                            options.title(addresses.get(0).getAddressLine(0));
-                            //addres.setText(addresses.get(0).getFeatureName() + ", " + addresses.get(0).getLocality() + ", " + addresses.get(0).getAdminArea() + ", " + addresses.get(0).getCountryName());
-                            //Toast.makeText(getApplicationContext(), "Address:- " + addresses.get(0).getFeatureName() + addresses.get(0).getAdminArea() + addresses.get(0).getLocality(), Toast.LENGTH_LONG).show();
+                            String cityName = addresses.get(0).getAddressLine(0);
+                            String stateName = addresses.get(0).getAddressLine(1);
+                            String countryName = addresses.get(0).getAddressLine(2);
+                         //   Toast.makeText(MapsActivity.this, addresses.get(0).getLocality(), Toast.LENGTH_SHORT).show();
+                             String ans=(countryName!=null?countryName+" ":"")+(stateName!=null?stateName+"  ":"")+(cityName!=null?cityName+"  ":"");
+                             if(ans!=null&&!ans.isEmpty()) {
+                                 txt_gbs.setText(ans);
+                                 options.title(ans);
+                             }else {
+                                 options.title("Unkonwn");
+                                 txt_gbs.setText("Unkonwn");
+                             }
+                            //options.title(addresses.get(0).getLocality());
+                            //txt_gbs.setText(addresses.get(0).getLocality());
                         }
                     }
                 }catch(Exception e){
+
                 }
-                marker=mMap.addMarker(options);
+                marker= mMap.addMarker(options);
                 mMap.animateCamera(CameraUpdateFactory.newLatLng(latLng));
-                txt_gbs.setText( Math.round(latLng.latitude)+","+Math.round(latLng.longitude)+"  ");
             }
         });
         googleMap.getUiSettings().setZoomGesturesEnabled(true);
-        // and move the map's camera to the same location.
     }
 
-    public static String excuteGet(String targetURL)
-    {
-        URL url;
-        HttpURLConnection connection = null;
-        try {
-            //Create connection
-            url = new URL(targetURL);
-            connection = (HttpURLConnection)url.openConnection();
-            connection.setRequestProperty("content-type", "application/json;  charset=utf-8");
-            connection.setRequestProperty("Content-Language", "en-US");
-            connection.setUseCaches (false);
-            connection.setDoInput(true);
-            connection.setDoOutput(false);
 
-            InputStream is;
-            int status = connection.getResponseCode();
-            if (status != HttpURLConnection.HTTP_OK)
-                is = connection.getErrorStream();
-            else
-                is = connection.getInputStream();
-            BufferedReader rd = new BufferedReader(new InputStreamReader(is));
-            String line;
-            StringBuffer response = new StringBuffer();
-            while((line = rd.readLine()) != null) {
-                response.append(line);
-                response.append('\r');
-            }
-            rd.close();
-            return response.toString();
-        } catch (Exception e) {
-            return null;
-        } finally {
-            if(connection != null) {
-                connection.disconnect();
-            }
-        }
-    }
 }
