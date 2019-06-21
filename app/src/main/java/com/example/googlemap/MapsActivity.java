@@ -232,7 +232,12 @@ public class MapsActivity extends FragmentActivity
                             String stateName = addresses.get(0).getAddressLine(1);
                             String countryName = addresses.get(0).getAddressLine(2);
                          //   Toast.makeText(MapsActivity.this, addresses.get(0).getLocality(), Toast.LENGTH_SHORT).show();
-                             String ans=(countryName!=null?countryName+" ":"")+(stateName!=null?stateName+"  ":"")+(cityName!=null?cityName+"  ":"");
+                          //  Toast.makeText(MapsActivity.this,stateName+"     ccc"+countryName+"   cit "+cityName , Toast.LENGTH_SHORT).show();
+                             String ans=(countryName!=null?countryName+" ":"")+(stateName!=null?
+                                     stateName+"  ":"")+
+                                     (cityName!=null? cityName.contains("Israel")
+                            ?(cityName.replace("Israel","Palestine")):cityName
+                                             +"  ":"");
                              ans=ans.trim();
                              if(ans!=null&&!ans.isEmpty()) {
                                  txt_gbs.setText(ans);
